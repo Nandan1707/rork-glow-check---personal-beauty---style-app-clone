@@ -1,270 +1,329 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
-import { ChevronRight, Camera, Shirt, Trophy } from 'lucide-react-native';
+import React, { useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Dimensions,
+  TouchableOpacity,
+  SafeAreaView,
+  Platform,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
-
+import { router } from 'expo-router';
+import { Sparkles, Camera, Users, Trophy } from 'lucide-react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withRepeat,
+  withSequence,
+  Easing,
+} from 'react-native-reanimated';
 import { useGlowStore } from '@/store/glowStore';
 import { colors } from '@/constants/colors';
 
+const { width, height } = Dimensions.get('window');
+
 export default function WelcomeScreen() {
-  const router = useRouter();
-  const { setName, completeProfile } = useGlowStore();
-  const [currentSlide, setCurrentSlide] = useState(0);
+  const { hasSeenWelcome, setHasSeenWelcome, isOnboardingComplete } = useGlowStore();
   
+  const sparkleScale = useSharedValue(1);
+  const sparkleRotation = useSharedValue(0);
+  const fadeInValue = useSharedValue(0);
+  const slideUpValue = useSharedValue(50);
+
+  useEffect(() => {
+    // Check if user should skip welcome
+    if (hasSeenWelcome && isOnboardingComplete) {
+      router.replace('/(tabs)');
+      return;
+    }
+    
+    // Start animations
+    fadeInValue.value = withTiming(1, { duration: 1000 });
+    slideUpValue.value = withTiming(0, { duration: 800, easing: Easing.out(Easing.cubic) });
+    
+    sparkleScale.value = withRepeat(
+      withSequence(
+        withTiming(1.2, { duration: 1000 }),
+        withTiming(1, { duration: 1000 })
+      ),
+      -1,
+      true
+    );
+    
+    sparkleRotation.value = withRepeat(
+      withTiming(360, { duration: 3000, easing: Easing.linear }),
+      -1,
+      false
+    );
+  }, []);
+
+  const animatedFadeStyle = useAnimatedStyle(() => ({
+    opacity: fadeInValue.value,
+  }));
+
+  const animatedSlideStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: slideUpValue.value }],
+  }));
+
+  const animatedSparkleStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: sparkleScale.value },
+      { rotate: `${sparkleRotation.value}deg` },
+    ],
+  }));
+
+  const handleGetStarted = () => {
+    setHasSeenWelcome(true);
+    if (isOnboardingComplete) {
+      router.replace('/(tabs)');
+    } else {
+      router.push('/onboarding');
+    }
+  };
+
   const features = [
     {
-      id: 'beauty',
-      icon: <Camera color={colors.white} size={32} />,
+      icon: Camera,
       title: 'AI Beauty Analysis',
-      description: 'Get personalized glow score and beauty recommendations',
+      description: 'Get your personalized glow score in seconds',
+      color: colors.primary,
     },
     {
-      id: 'outfit',
-      icon: <Shirt color={colors.white} size={32} />,
-      title: 'Smart Outfit Analysis',
-      description: 'Perfect your style for any event with AI feedback',
+      icon: Trophy,
+      title: 'Glow Challenges',
+      description: 'Join 30-day transformations with thousands of women',
+      color: '#FFD700',
     },
     {
-      id: 'challenges',
-      icon: <Trophy color={colors.white} size={32} />,
-      title: '30-Day Glow Challenges',
-      description: 'Transform with daily tasks and track your progress',
+      icon: Users,
+      title: 'Anonymous Comparison',
+      description: 'See how you compare with complete privacy',
+      color: '#4ECDC4',
     },
   ];
-  
-  const handleSkip = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Set a default name
-    setName('Beautiful');
-    completeProfile();
-    router.replace('/');
-  };
-  
-  const handleGetStarted = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push('/onboarding');
-  };
-  
-  const handleLogin = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Navigate to modal for login
-    router.push('/modal');
-  };
-  
-  const handleSlideChange = (index: number) => {
-    setCurrentSlide(index);
-  };
-  
+
   return (
-    <>
-      <Stack.Screen 
-        options={{
-          headerShown: false,
-        }} 
-      />
-      <View style={styles.container} testID="welcome-screen">
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.skipButton}
-            onPress={handleSkip}
-            testID="skip-button"
-          >
-            <Text style={styles.skipText}>Skip</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.dotsContainer}>
-            {features.map((_, index) => (
-              <View 
-                key={index} 
-                style={[
-                  styles.dot, 
-                  currentSlide === index ? styles.activeDot : {}
-                ]} 
-              />
-            ))}
-          </View>
-        </View>
-        
+    <SafeAreaView style={styles.container}>
+      <LinearGradient
+        colors={['#FF6B9D', '#FF8E7F', '#FFB6C1']}
+        style={styles.gradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
         <View style={styles.content}>
-          <Text style={styles.title}>Welcome to Glow Check</Text>
-          <Text style={styles.subtitle}>Your AI Beauty & Style Coach</Text>
-          
-          <ScrollView 
-            horizontal 
-            pagingEnabled 
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={(event) => {
-              const slideIndex = Math.round(
-                event.nativeEvent.contentOffset.x / event.nativeEvent.layoutMeasurement.width
-              );
-              handleSlideChange(slideIndex);
-            }}
-            style={styles.carousel}
-            testID="feature-carousel"
-          >
-            {features.map((feature) => (
-              <View key={feature.id} style={styles.slide}>
-                <LinearGradient
-                  colors={
-                    feature.id === 'beauty' 
-                      ? [colors.gradientStart, colors.gradientEnd]
-                      : feature.id === 'outfit'
-                        ? [colors.secondaryGradientStart, colors.secondaryGradientEnd]
-                        : [colors.tertiary, '#3CB371']
-                  }
-                  style={styles.featureIcon}
+          {/* Header with animated sparkle */}
+          <Animated.View style={[styles.header, animatedFadeStyle]}>
+            <Animated.View style={[styles.sparkleContainer, animatedSparkleStyle]}>
+              <Sparkles size={60} color="white" />
+            </Animated.View>
+            <Text style={styles.title}>Glow Check</Text>
+            <Text style={styles.subtitle}>
+              Discover your beauty potential with AI-powered analysis
+            </Text>
+          </Animated.View>
+
+          {/* Features */}
+          <Animated.View style={[styles.featuresContainer, animatedSlideStyle]}>
+            {features.map((feature, index) => {
+              const Icon = feature.icon;
+              return (
+                <Animated.View
+                  key={index}
+                  style={[
+                    styles.featureCard,
+                    animatedFadeStyle,
+                  ]}
                 >
-                  {feature.icon}
-                </LinearGradient>
-                <Text style={styles.featureTitle}>{feature.title}</Text>
-                <Text style={styles.featureDescription}>{feature.description}</Text>
-              </View>
-            ))}
-          </ScrollView>
+                  <View style={[styles.featureIcon, { backgroundColor: feature.color }]}>
+                    <Icon size={24} color="white" />
+                  </View>
+                  <View style={styles.featureContent}>
+                    <Text style={styles.featureTitle}>{feature.title}</Text>
+                    <Text style={styles.featureDescription}>{feature.description}</Text>
+                  </View>
+                </Animated.View>
+              );
+            })}
+          </Animated.View>
+
+          {/* Stats */}
+          <Animated.View style={[styles.statsContainer, animatedFadeStyle]}>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>2.3M+</Text>
+              <Text style={styles.statLabel}>Glow Checks</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>890K+</Text>
+              <Text style={styles.statLabel}>Happy Users</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>4.8⭐</Text>
+              <Text style={styles.statLabel}>App Rating</Text>
+            </View>
+          </Animated.View>
+
+          {/* CTA Button */}
+          <Animated.View style={[styles.ctaContainer, animatedSlideStyle]}>
+            <TouchableOpacity style={styles.ctaButton} onPress={handleGetStarted}>
+              <LinearGradient
+                colors={['#FFFFFF', '#F8F9FA']}
+                style={styles.ctaGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Text style={styles.ctaText}>Start Your Glow Journey</Text>
+                <Sparkles size={20} color={colors.primary} style={styles.ctaIcon} />
+              </LinearGradient>
+            </TouchableOpacity>
+            
+            <Text style={styles.disclaimer}>
+              Join millions of women discovering their beauty potential
+            </Text>
+          </Animated.View>
         </View>
-        
-        <View style={styles.footer}>
-          <TouchableOpacity 
-            style={styles.getStartedButton}
-            onPress={handleGetStarted}
-            testID="get-started-button"
-          >
-            <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
-              style={styles.gradientButton}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              <Text style={styles.getStartedText}>Get Started - It's Free! 🚀</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.loginButton}
-            onPress={handleLogin}
-            testID="login-button"
-          >
-            <Text style={styles.loginText}>Already have account?</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </>
+      </LinearGradient>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-  },
-  skipButton: {
-    padding: 8,
-  },
-  skipText: {
-    fontSize: 16,
-    color: colors.textSecondary,
-  },
-  dotsContainer: {
-    flexDirection: 'row',
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.lightGray,
-    marginHorizontal: 4,
-  },
-  activeDot: {
-    backgroundColor: colors.primary,
-    width: 16,
+  gradient: {
+    flex: 1,
   },
   content: {
     flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 40,
+  },
+  header: {
     alignItems: 'center',
-    paddingHorizontal: 20,
+    marginBottom: 40,
+  },
+  sparkleContainer: {
+    marginBottom: 20,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 8,
+    fontSize: 42,
+    fontWeight: 'bold',
+    color: 'white',
     textAlign: 'center',
+    marginBottom: 12,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   subtitle: {
     fontSize: 18,
-    color: colors.textSecondary,
-    marginBottom: 40,
-    textAlign: 'center',
-  },
-  carousel: {
-    flex: 1,
-    width: '100%',
-  },
-  slide: {
-    width: 350,
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  featureIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  featureTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  featureDescription: {
-    fontSize: 16,
-    color: colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
     lineHeight: 24,
+    paddingHorizontal: 20,
   },
-  footer: {
-    padding: 20,
+  featuresContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    marginVertical: 20,
   },
-  getStartedButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginBottom: 16,
-    elevation: 3,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  gradientButton: {
-    paddingVertical: 16,
+  featureCard: {
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
   },
-  getStartedText: {
-    color: colors.white,
+  featureIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  featureContent: {
+    flex: 1,
+  },
+  featureTitle: {
     fontSize: 18,
     fontWeight: '600',
+    color: 'white',
+    marginBottom: 4,
   },
-  loginButton: {
+  featureDescription: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    lineHeight: 20,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
     alignItems: 'center',
-    paddingVertical: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 30,
   },
-  loginText: {
-    fontSize: 16,
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  ctaContainer: {
+    alignItems: 'center',
+  },
+  ctaButton: {
+    width: '100%',
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  ctaGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 32,
+  },
+  ctaText: {
+    fontSize: 18,
+    fontWeight: '600',
     color: colors.primary,
-    fontWeight: '500',
+    marginRight: 8,
+  },
+  ctaIcon: {
+    marginLeft: 4,
+  },
+  disclaimer: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    marginTop: 16,
+    lineHeight: 20,
   },
 });
